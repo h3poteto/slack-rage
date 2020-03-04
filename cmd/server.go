@@ -6,7 +6,8 @@ import (
 )
 
 type runServer struct {
-	channel string
+	threshold int
+	channel   string
 }
 
 func runServerCmd() *cobra.Command {
@@ -18,15 +19,14 @@ func runServerCmd() *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&r.channel, "channel", "c", ".*", "Event watching channel name. Please provide regexp format.")
+	flags.IntVarP(&r.threshold, "threshold", "t", 10, "Threshold for rage judgement.")
+	flags.StringVarP(&r.channel, "channel", "c", "", "Notify channel.")
 
 	return cmd
 
 }
 
 func (r *runServer) run(cmd *cobra.Command, args []string) {
-	s := &server.Server{
-		Channel: r.channel,
-	}
+	s := server.NewServer(r.threshold, r.channel)
 	s.Serve()
 }
