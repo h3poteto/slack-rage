@@ -142,11 +142,15 @@ func (s *Server) Post(channelID string) error {
 	if err != nil {
 		return err
 	}
-	var notifyChannel slack.Channel
+	var notifyChannel *slack.Channel
 	for _, c := range channelList {
 		if c.Name == s.channel {
-			notifyChannel = c
+			notifyChannel = &c
+			break
 		}
+	}
+	if notifyChannel == nil {
+		return fmt.Errorf("notify channel %s does not exist", s.channel)
 	}
 	msgOptText := slack.MsgOptionText("<#"+channelID+"> が盛り上がってるっぽいよ！", false)
 	_, _, err = api.PostMessage(notifyChannel.ID, msgOptText)
