@@ -11,6 +11,8 @@ import (
 	"github.com/slack-go/slack"
 )
 
+var notifyHistory = map[string]time.Time{}
+
 type Server struct {
 	threshold int
 	period    int
@@ -139,11 +141,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		now := time.Now()
+		if timestamp, ok := notifyHistory[channel]; ok && now.Sub(timestamp) < 10*time.Minute {
+			logrus.Info("Skip notification because of cool time")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		logrus.Info("Notify")
 		err = s.Post(channel)
 		if err != nil {
 			logrus.Errorf("Failed to post: %s", err)
 		}
+		notifyHistory[channel] = now
 
 		w.WriteHeader(http.StatusOK)
 		return
