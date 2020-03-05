@@ -78,7 +78,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		logrus.Infof("Author is: %+v", user)
+		logrus.Debugf("Author is: %+v", user)
 		if user.IsBot {
 			logrus.Info("User is bot")
 			w.WriteHeader(http.StatusOK)
@@ -97,20 +97,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Pick up oldest message in the coversation.
 		oldest := history.Messages[len(history.Messages)-1]
-		logrus.Infof("Oldest: %+v", oldest)
+		logrus.Debugf("Oldest: %+v", oldest)
+
+		// Get the oldest timestamp.
 		startUnix, err := strconv.ParseFloat(oldest.Timestamp, 64)
 		if err != nil {
 			logrus.Errorf("Failed to parse timestamp: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Get most recently timestamp.
 		endUnix, err := strconv.ParseFloat(message.String("ts"), 64)
 		if err != nil {
 			logrus.Errorf("Failed to parse timestamp: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Compaire two timestamps.
 		diff := time.Unix(int64(endUnix), 0).Sub(time.Unix(int64(startUnix), 0))
 		logrus.Infof("Diff: %v", diff)
 
@@ -119,8 +127,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		logrus.Info("Post")
-
+		logrus.Info("Notify")
 		err = s.Post(channel)
 		if err != nil {
 			logrus.Errorf("Failed to post: %s", err)

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/h3poteto/slack-rage/server"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,11 @@ func runServerCmd() *cobra.Command {
 }
 
 func (r *runServer) run(cmd *cobra.Command, args []string) {
+	verbose := generalConfig()
+	logrus.SetLevel(logrus.InfoLevel)
+	if verbose {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 	s := server.NewServer(r.threshold, r.period, r.channel)
 	s.Serve()
 }
