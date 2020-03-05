@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/h3poteto/slack-rage/server"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -10,6 +9,7 @@ type runServer struct {
 	threshold int
 	period    int
 	channel   string
+	verbose   bool
 }
 
 func runServerCmd() *cobra.Command {
@@ -24,17 +24,13 @@ func runServerCmd() *cobra.Command {
 	flags.IntVarP(&r.threshold, "threshold", "t", 10, "Threshold for rage judgement.")
 	flags.IntVarP(&r.period, "period", "p", 60, "Observation period seconds for rage judgement. This CLI notify when there are more than threshold posts per period.")
 	flags.StringVarP(&r.channel, "channel", "c", "", "Notify channel.")
+	flags.BoolVarP(&r.verbose, "verbose", "v", false, "Enable verbose mode")
 
 	return cmd
 
 }
 
 func (r *runServer) run(cmd *cobra.Command, args []string) {
-	verbose := generalConfig()
-	logrus.SetLevel(logrus.InfoLevel)
-	if verbose {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-	s := server.NewServer(r.threshold, r.period, r.channel)
+	s := server.NewServer(r.threshold, r.period, r.channel, r.verbose)
 	s.Serve()
 }

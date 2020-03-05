@@ -18,21 +18,28 @@ type Server struct {
 	period    int
 	channel   string
 	token     string
+	logger    *logrus.Logger
 }
 
-func NewServer(threshold, period int, channel string) *Server {
+func NewServer(threshold, period int, channel string, verbose bool) *Server {
 	token := os.Getenv("SLACK_TOKEN")
+	logger := logrus.New()
+	fmt.Println(verbose)
+	if verbose {
+		logger.SetLevel(logrus.DebugLevel)
+	}
 	return &Server{
 		threshold,
 		period,
 		channel,
 		token,
+		logger,
 	}
 }
 
 func (s *Server) Serve() error {
 	http.HandleFunc("/", s.ServeHTTP)
-	logrus.Info("Listening on :9090")
+	s.logger.Info("Listening on :9090")
 	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
 		return fmt.Errorf("Failed to start server: %s", err)
@@ -44,14 +51,14 @@ func (s *Server) Serve() error {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	event, err := DecodeJSON(r.Body)
 	if err != nil {
-		logrus.Errorf("Request body is not Event payload: %s", err)
+		s.logger.Errorf("Request body is not Event payload: %s", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	switch event.Type() {
 	case "url_verification":
-		logrus.Info("Receive URL Verifciation event")
+		s.logger.Info("Receive URL Verifciation event")
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(event.String("challenge")))
@@ -59,11 +66,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "event_callback":
 		mes, ok := event["event"].(map[string]interface{})
 		if !ok {
-			logrus.Errorf("Failed to cast event: %+v", event)
+			s.logger.Errorf("Failed to cast event: %+v", event)
 			http.Error(w, "failed to cast", http.StatusBadRequest)
 			return
 		}
-		logrus.Infof("Received event: %+v", mes)
+		s.logger.Infof("Received event: %+v", mes)
 
 		message := Event(mes)
 		if message.Type() != "message" {
@@ -72,17 +79,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Through posts from bots.
-		username := message.String("user")
+		userID := message.String("user")
 		api := slack.New(s.token)
-		user, err := api.GetUserInfo(username)
+		isBot, err := s.userIsBot(api, userID)
 		if err != nil {
-			logrus.Errorf("Can not get user info: %+v", err)
+			s.logger.Errorf("Can not get user info: %+v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		logrus.Debugf("Author is: %+v", user)
-		if user.IsBot {
-			logrus.Info("User is bot")
+		if isBot {
+			s.logger.Info("User is bot")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -95,19 +101,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		history, err := api.GetConversationHistory(params)
 		if err != nil {
-			logrus.Errorf("Can not get history: %+v", err)
+			s.logger.Errorf("Can not get history: %+v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// Pick up oldest message in the coversation.
 		oldest := history.Messages[len(history.Messages)-1]
-		logrus.Debugf("Oldest: %+v", oldest)
+		s.logger.Debugf("Oldest: %+v", oldest)
 
 		// Get the oldest timestamp.
 		startUnix, err := strconv.ParseFloat(oldest.Timestamp, 64)
 		if err != nil {
-			logrus.Errorf("Failed to parse timestamp: %s", err)
+			s.logger.Errorf("Failed to parse timestamp: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -115,14 +121,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Get most recently timestamp.
 		endUnix, err := strconv.ParseFloat(message.String("ts"), 64)
 		if err != nil {
-			logrus.Errorf("Failed to parse timestamp: %s", err)
+			s.logger.Errorf("Failed to parse timestamp: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// Compaire two timestamps.
 		diff := time.Unix(int64(endUnix), 0).Sub(time.Unix(int64(startUnix), 0))
-		logrus.Infof("Diff: %v", diff)
+		s.logger.Infof("Diff: %v", diff)
 
 		if (time.Duration(s.period) * time.Second) < diff {
 			w.WriteHeader(http.StatusOK)
@@ -135,7 +141,21 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			speakers[mes.User] = true
 		}
 
-		logrus.Infof("%d speakers in the conversation", len(speakers))
+		s.logger.Debugf("speackers: %+v", speakers)
+		// Remove bots in speakers.
+		for _, userID := range keys(speakers) {
+			isBot, err := s.userIsBot(api, userID)
+			if err != nil {
+				s.logger.Errorf("Can not get user info: %+v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if isBot {
+				delete(speakers, userID)
+			}
+		}
+
+		s.logger.Infof("%d speakers in the conversation", len(speakers))
 		if len(speakers) < 2 {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -143,22 +163,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		now := time.Now()
 		if timestamp, ok := notifyHistory[channel]; ok && now.Sub(timestamp) < 10*time.Minute {
-			logrus.Info("Skip notification because of cool time")
+			s.logger.Info("Skip notification because of cool time")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
-		logrus.Info("Notify")
+		s.logger.Info("Notify")
 		err = s.Post(channel)
 		if err != nil {
-			logrus.Errorf("Failed to post: %s", err)
+			s.logger.Errorf("Failed to post: %s", err)
 		}
 		notifyHistory[channel] = now
 
 		w.WriteHeader(http.StatusOK)
 		return
 	default:
-		logrus.Warnf("Receive unknown event type: %s", event.Type())
+		s.logger.Warnf("Receive unknown event type: %s", event.Type())
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -187,4 +207,21 @@ func (s *Server) Post(channelID string) error {
 	_, _, err = api.PostMessage(notifyChannel.ID, msgOptText)
 
 	return err
+}
+
+func keys(m map[string]bool) []string {
+	ks := []string{}
+	for k, _ := range m {
+		ks = append(ks, k)
+	}
+	return ks
+}
+
+func (s *Server) userIsBot(api *slack.Client, userID string) (bool, error) {
+	user, err := api.GetUserInfo(userID)
+	if err != nil {
+		return false, err
+	}
+	s.logger.Debugf("Author is: %+v", user)
+	return user.IsBot, nil
 }
