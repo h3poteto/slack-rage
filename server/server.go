@@ -127,6 +127,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Get speakers.
+		speakers := map[string]bool{}
+		for _, mes := range history.Messages {
+			speakers[mes.User] = true
+		}
+
+		logrus.Infof("%d speakers in the conversation", len(speakers))
+		if len(speakers) < 2 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		logrus.Info("Notify")
 		err = s.Post(channel)
 		if err != nil {
