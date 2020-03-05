@@ -13,14 +13,16 @@ import (
 
 type Server struct {
 	threshold int
+	period    int
 	channel   string
 	token     string
 }
 
-func NewServer(threshold int, channel string) *Server {
+func NewServer(threshold, period int, channel string) *Server {
 	token := os.Getenv("SLACK_TOKEN")
 	return &Server{
 		threshold,
+		period,
 		channel,
 		token,
 	}
@@ -112,7 +114,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		diff := time.Unix(int64(endUnix), 0).Sub(time.Unix(int64(startUnix), 0))
 		logrus.Infof("Diff: %v", diff)
 
-		if (10 * time.Minute) < diff {
+		if (time.Duration(s.period) * time.Second) < diff {
 			w.WriteHeader(http.StatusOK)
 			return
 		}

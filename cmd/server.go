@@ -7,6 +7,7 @@ import (
 
 type runServer struct {
 	threshold int
+	period    int
 	channel   string
 }
 
@@ -20,6 +21,7 @@ func runServerCmd() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.IntVarP(&r.threshold, "threshold", "t", 10, "Threshold for rage judgement.")
+	flags.IntVarP(&r.period, "period", "p", 60, "Observation period seconds for rage judgement. This CLI notify when there are more than threshold posts per period.")
 	flags.StringVarP(&r.channel, "channel", "c", "", "Notify channel.")
 
 	return cmd
@@ -27,6 +29,6 @@ func runServerCmd() *cobra.Command {
 }
 
 func (r *runServer) run(cmd *cobra.Command, args []string) {
-	s := server.NewServer(r.threshold, r.channel)
+	s := server.NewServer(r.threshold, r.period, r.channel)
 	s.Serve()
 }
