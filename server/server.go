@@ -24,7 +24,6 @@ type Server struct {
 func NewServer(threshold, period int, channel string, verbose bool) *Server {
 	token := os.Getenv("SLACK_TOKEN")
 	logger := logrus.New()
-	fmt.Println(verbose)
 	if verbose {
 		logger.SetLevel(logrus.DebugLevel)
 	}
@@ -84,7 +83,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		isBot, err := s.userIsBot(api, userID)
 		if err != nil {
 			s.logger.Errorf("Can not get user info: %+v", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		if isBot {
@@ -146,9 +145,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, userID := range keys(speakers) {
 			isBot, err := s.userIsBot(api, userID)
 			if err != nil {
-				s.logger.Errorf("Can not get user info: %+v", err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
+				s.logger.Warnf("Can not get user info: %+v", err)
+				delete(speakers, userID)
+				continue
 			}
 			if isBot {
 				delete(speakers, userID)
