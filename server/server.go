@@ -84,7 +84,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		isBot, err := s.userIsBot(api, userID)
 		if err != nil {
 			s.logger.Errorf("Can not get user info: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if isBot {
@@ -114,7 +114,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		startUnix, err := strconv.ParseFloat(oldest.Timestamp, 64)
 		if err != nil {
 			s.logger.Errorf("Failed to parse timestamp: %s", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -122,7 +122,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		endUnix, err := strconv.ParseFloat(message.String("ts"), 64)
 		if err != nil {
 			s.logger.Errorf("Failed to parse timestamp: %s", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -147,7 +147,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			isBot, err := s.userIsBot(api, userID)
 			if err != nil {
 				s.logger.Errorf("Can not get user info: %+v", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 			if isBot {
