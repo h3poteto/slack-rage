@@ -14,5 +14,5 @@ var RootCmd = &cobra.Command{
 func init() {
 	cobra.OnInitialize()
 
-	RootCmd.AddCommand(versionCmd(), runServerCmd())
+	RootCmd.AddCommand(versionCmd(), runServerCmd(), runRTMCmd())
 }
