@@ -8,7 +8,6 @@ import (
 
 	"github.com/h3poteto/slack-rage/rage"
 	"github.com/sirupsen/logrus"
-	"github.com/slack-go/slack"
 )
 
 var notifyHistory = map[string]time.Time{}
@@ -55,8 +54,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api := slack.New(s.token)
-	detector := rage.New(s.threshold, s.period, s.channel, s.logger, api)
+	detector := rage.New(s.threshold, s.period, s.channel, s.logger, s.token)
 
 	switch event.Type() {
 	case "url_verification":
@@ -82,8 +80,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// Through posts from bots.
 		userID := message.String("user")
-		api := slack.New(s.token)
-		isBot, err := s.userIsBot(api, userID)
+		isBot, err := detector.UserIsBot(userID)
 		if err != nil {
 			s.logger.Errorf("Can not get user info: %+v", err)
 			w.WriteHeader(http.StatusOK)
@@ -108,46 +105,4 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-}
-
-func (s *Server) Post(channelID string) error {
-	api := slack.New(s.token)
-	params := &slack.GetConversationsParameters{
-		Limit: 999,
-	}
-	channelList, _, err := api.GetConversations(params)
-	if err != nil {
-		return err
-	}
-	var notifyChannel *slack.Channel
-	for _, c := range channelList {
-		if c.Name == s.channel {
-			notifyChannel = &c
-			break
-		}
-	}
-	if notifyChannel == nil {
-		return fmt.Errorf("notify channel %s does not exist", s.channel)
-	}
-	msgOptText := slack.MsgOptionText("<#"+channelID+"> が盛り上がってるっぽいよ！", false)
-	_, _, err = api.PostMessage(notifyChannel.ID, msgOptText)
-
-	return err
-}
-
-func keys(m map[string]bool) []string {
-	ks := []string{}
-	for k, _ := range m {
-		ks = append(ks, k)
-	}
-	return ks
-}
-
-func (s *Server) userIsBot(api *slack.Client, userID string) (bool, error) {
-	user, err := api.GetUserInfo(userID)
-	if err != nil {
-		return false, err
-	}
-	s.logger.Debugf("Author is: %+v", user)
-	return user.IsBot, nil
 }

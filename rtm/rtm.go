@@ -3,19 +3,29 @@ package rtm
 import (
 	"os"
 
+	"github.com/h3poteto/slack-rage/rage"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
 
 type RTM struct {
-	token  string
-	logger *logrus.Logger
+	threshold int
+	period    int
+	channel   string
+	token     string
+	logger    *logrus.Logger
 }
 
-func New() *RTM {
+func New(threshold, period int, channel string, verbose bool) *RTM {
 	token := os.Getenv("SLACK_TOKEN")
 	logger := logrus.New()
+	if verbose {
+		logger.SetLevel(logrus.DebugLevel)
+	}
 	return &RTM{
+		threshold,
+		period,
+		channel,
 		token,
 		logger,
 	}
@@ -23,6 +33,11 @@ func New() *RTM {
 
 func (r *RTM) Start() {
 	api := slack.New(r.token)
+
+	// We have to create classic slack app using RTM.
+	// Classic slack app require OAuth token to call REST API separately from bot token.
+	detector := rage.New(r.threshold, r.period, r.channel, r.logger, os.Getenv("OAUTH_TOKEN"))
+
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
@@ -43,17 +58,18 @@ func (r *RTM) Start() {
 
 			// Through posts from bots.
 			userID := ev.Msg.User
-			user, err := api.GetUserInfo(userID)
+			isBot, err := detector.UserIsBot(userID)
 			if err != nil {
 				r.logger.Errorf("Can not get user info: %s", err)
 				continue
 			}
-			r.logger.Debugf("Author is: %+v", user)
-			if user.IsBot {
+			if isBot {
 				r.logger.Info("User is bot")
 				continue
 			}
 			// Detect rage
+			detector.Detect(ev.Msg.Channel, ev.Msg.Timestamp)
+
 		case *slack.RTMError:
 			r.logger.Errorf("Error: %s", ev.Error())
 		case *slack.InvalidAuthEvent:

@@ -26,8 +26,9 @@ type Rage struct {
 	notifyHistory map[string]time.Time
 }
 
-func New(threshold, period int, channel string, logger *logrus.Logger, slackClient *slack.Client) *Rage {
+func New(threshold, period int, channel string, logger *logrus.Logger, token string) *Rage {
 	notifyHistory := map[string]time.Time{}
+	slackClient := slack.New(token)
 	return &Rage{
 		threshold,
 		period,
@@ -85,7 +86,7 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	r.logger.Debugf("speackers: %+v", speakers)
 	// Remove bots in speakers.
 	for _, userID := range keys(speakers) {
-		isBot, err := r.userIsBot(r.slackClient, userID)
+		isBot, err := r.UserIsBot(userID)
 		if err != nil {
 			r.logger.Warnf("Can not get user info: %+v", err)
 			delete(speakers, userID)
@@ -97,7 +98,7 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	}
 
 	r.logger.Infof("%d speakers in the conversation", len(speakers))
-	if len(speakers) < 2 {
+	if len(speakers) < 1 {
 		return nil
 	}
 
@@ -108,7 +109,7 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	}
 
 	r.logger.Info("Notify")
-	err = r.Post(r.slackClient, messageChannelID)
+	err = r.Post(messageChannelID)
 	if err != nil {
 		r.logger.Errorf("Failed to post: %s", err)
 		return err
@@ -118,8 +119,8 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	return nil
 }
 
-func (r *Rage) userIsBot(api *slack.Client, userID string) (bool, error) {
-	user, err := api.GetUserInfo(userID)
+func (r *Rage) UserIsBot(userID string) (bool, error) {
+	user, err := r.slackClient.GetUserInfo(userID)
 	if err != nil {
 		return false, err
 	}
@@ -127,11 +128,11 @@ func (r *Rage) userIsBot(api *slack.Client, userID string) (bool, error) {
 	return user.IsBot, nil
 }
 
-func (r *Rage) Post(api *slack.Client, messageChannelID string) error {
+func (r *Rage) Post(messageChannelID string) error {
 	params := &slack.GetConversationsParameters{
 		Limit: 999,
 	}
-	channelList, _, err := api.GetConversations(params)
+	channelList, _, err := r.slackClient.GetConversations(params)
 	if err != nil {
 		return err
 	}
@@ -146,7 +147,7 @@ func (r *Rage) Post(api *slack.Client, messageChannelID string) error {
 		return fmt.Errorf("notify channel %s does not exist", r.channel)
 	}
 	msgOptText := slack.MsgOptionText("<#"+messageChannelID+"> が盛り上がってるっぽいよ！", false)
-	_, _, err = api.PostMessage(notifyChannel.ID, msgOptText)
+	_, _, err = r.slackClient.PostMessage(notifyChannel.ID, msgOptText)
 
 	return err
 }
