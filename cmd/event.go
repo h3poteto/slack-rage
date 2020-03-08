@@ -1,21 +1,21 @@
 package cmd
 
 import (
-	"github.com/h3poteto/slack-rage/server"
+	"github.com/h3poteto/slack-rage/event"
 	"github.com/spf13/cobra"
 )
 
-type runServer struct {
+type runEvent struct {
 	threshold int
 	period    int
 	channel   string
 	verbose   bool
 }
 
-func runServerCmd() *cobra.Command {
-	r := &runServer{}
+func runEventCmd() *cobra.Command {
+	r := &runEvent{}
 	cmd := &cobra.Command{
-		Use:   "server",
+		Use:   "event",
 		Short: "Run webhook server for slack Event API",
 		Run:   r.run,
 	}
@@ -30,7 +30,7 @@ func runServerCmd() *cobra.Command {
 
 }
 
-func (r *runServer) run(cmd *cobra.Command, args []string) {
-	s := server.NewServer(r.threshold, r.period, r.channel, r.verbose)
+func (r *runEvent) run(cmd *cobra.Command, args []string) {
+	s := event.NewServer(r.threshold, r.period, r.channel, r.verbose)
 	s.Serve()
 }
