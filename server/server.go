@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
+	"github.com/h3poteto/slack-rage/rage"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
@@ -55,6 +55,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	api := slack.New(s.token)
+	detector := rage.New(s.threshold, s.period, s.channel, s.logger, api)
+
 	switch event.Type() {
 	case "url_verification":
 		s.logger.Info("Receive URL Verifciation event")
@@ -92,87 +95,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Get recently messages.
-		channel := message.String("channel")
-		params := &slack.GetConversationHistoryParameters{
-			ChannelID: channel,
-			Limit:     s.threshold,
-		}
-		history, err := api.GetConversationHistory(params)
+		err = detector.Detect(message.String("channel"), message.String("ts"))
 		if err != nil {
-			s.logger.Errorf("Can not get history: %+v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		// Pick up oldest message in the coversation.
-		oldest := history.Messages[len(history.Messages)-1]
-		s.logger.Debugf("Oldest: %+v", oldest)
-
-		// Get the oldest timestamp.
-		startUnix, err := strconv.ParseFloat(oldest.Timestamp, 64)
-		if err != nil {
-			s.logger.Errorf("Failed to parse timestamp: %s", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Get most recently timestamp.
-		endUnix, err := strconv.ParseFloat(message.String("ts"), 64)
-		if err != nil {
-			s.logger.Errorf("Failed to parse timestamp: %s", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Compaire two timestamps.
-		diff := time.Unix(int64(endUnix), 0).Sub(time.Unix(int64(startUnix), 0))
-		s.logger.Infof("Diff: %v", diff)
-
-		if (time.Duration(s.period) * time.Second) < diff {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// Get speakers.
-		speakers := map[string]bool{}
-		for _, mes := range history.Messages {
-			speakers[mes.User] = true
-		}
-
-		s.logger.Debugf("speackers: %+v", speakers)
-		// Remove bots in speakers.
-		for _, userID := range keys(speakers) {
-			isBot, err := s.userIsBot(api, userID)
-			if err != nil {
-				s.logger.Warnf("Can not get user info: %+v", err)
-				delete(speakers, userID)
-				continue
-			}
-			if isBot {
-				delete(speakers, userID)
-			}
-		}
-
-		s.logger.Infof("%d speakers in the conversation", len(speakers))
-		if len(speakers) < 2 {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		now := time.Now()
-		if timestamp, ok := notifyHistory[channel]; ok && now.Sub(timestamp) < 10*time.Minute {
-			s.logger.Info("Skip notification because of cool time")
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		s.logger.Info("Notify")
-		err = s.Post(channel)
-		if err != nil {
-			s.logger.Errorf("Failed to post: %s", err)
-		}
-		notifyHistory[channel] = now
 
 		w.WriteHeader(http.StatusOK)
 		return
