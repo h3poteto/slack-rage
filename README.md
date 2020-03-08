@@ -91,7 +91,7 @@ $ docker run --rm -e SLACK_TOKEN={BotUserOAuthAccessToken} h3poteto/slack-rage e
 ```
 
 You have to prepare Web server to receive webhook from Slack Event API. So please run this docker image in your server, and assign DNS, like `slack-rage.example.com`.
-And please set it to RequestURL in Event Subscriptions.
+And please set it to RequestURL in Event Subscriptions, and enable Events.
 
 ![event-subscription](./readme/event-subscription.png)
 
