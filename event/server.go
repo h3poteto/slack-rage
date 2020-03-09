@@ -36,7 +36,8 @@ func NewServer(threshold, period int, channel string, verbose bool) *Server {
 }
 
 func (s *Server) Serve() error {
-	http.HandleFunc("/", s.ServeHTTP)
+	http.HandleFunc("/health_check", s.HealthCheck)
+	http.HandleFunc("/", s.HandleEvent)
 	s.logger.Info("Listening on :9090")
 	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
@@ -46,7 +47,12 @@ func (s *Server) Serve() error {
 	return nil
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 	event, err := DecodeJSON(r.Body)
 	if err != nil {
 		s.logger.Errorf("Request body is not Event payload: %s", err)
