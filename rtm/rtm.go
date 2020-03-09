@@ -14,6 +14,7 @@ type RTM struct {
 	channel   string
 	token     string
 	logger    *logrus.Logger
+	detector  *rage.Rage
 }
 
 func New(threshold, period int, channel string, verbose bool) *RTM {
@@ -22,21 +23,21 @@ func New(threshold, period int, channel string, verbose bool) *RTM {
 	if verbose {
 		logger.SetLevel(logrus.DebugLevel)
 	}
+	// We have to create classic slack app using RTM.
+	// Classic slack app require OAuth token to call REST API separately from bot token.
+	detector := rage.New(threshold, period, channel, logger, os.Getenv("OAUTH_TOKEN"))
 	return &RTM{
 		threshold,
 		period,
 		channel,
 		token,
 		logger,
+		detector,
 	}
 }
 
 func (r *RTM) Start() {
 	api := slack.New(r.token)
-
-	// We have to create classic slack app using RTM.
-	// Classic slack app require OAuth token to call REST API separately from bot token.
-	detector := rage.New(r.threshold, r.period, r.channel, r.logger, os.Getenv("OAUTH_TOKEN"))
 
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
@@ -58,7 +59,7 @@ func (r *RTM) Start() {
 
 			// Through posts from bots.
 			userID := ev.Msg.User
-			isBot, err := detector.UserIsBot(userID)
+			isBot, err := r.detector.UserIsBot(userID)
 			if err != nil {
 				r.logger.Errorf("Can not get user info: %s", err)
 				continue
@@ -68,7 +69,7 @@ func (r *RTM) Start() {
 				continue
 			}
 			// Detect rage
-			detector.Detect(ev.Msg.Channel, ev.Msg.Timestamp)
+			r.detector.Detect(ev.Msg.Channel, ev.Msg.Timestamp)
 
 		case *slack.RTMError:
 			r.logger.Errorf("Error: %s", ev.Error())
