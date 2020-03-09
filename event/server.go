@@ -18,6 +18,7 @@ type Server struct {
 	channel   string
 	token     string
 	logger    *logrus.Logger
+	detector  *rage.Rage
 }
 
 func NewServer(threshold, period int, channel string, verbose bool) *Server {
@@ -26,12 +27,14 @@ func NewServer(threshold, period int, channel string, verbose bool) *Server {
 	if verbose {
 		logger.SetLevel(logrus.DebugLevel)
 	}
+	detector := rage.New(threshold, period, channel, logger, token)
 	return &Server{
 		threshold,
 		period,
 		channel,
 		token,
 		logger,
+		detector,
 	}
 }
 
@@ -60,8 +63,6 @@ func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	detector := rage.New(s.threshold, s.period, s.channel, s.logger, s.token)
-
 	switch event.Type() {
 	case "url_verification":
 		s.logger.Info("Receive URL Verifciation event")
@@ -86,7 +87,7 @@ func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 
 		// Through posts from bots.
 		userID := message.String("user")
-		isBot, err := detector.UserIsBot(userID)
+		isBot, err := s.detector.UserIsBot(userID)
 		if err != nil {
 			s.logger.Errorf("Can not get user info: %+v", err)
 			w.WriteHeader(http.StatusOK)
@@ -98,7 +99,7 @@ func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = detector.Detect(message.String("channel"), message.String("ts"))
+		err = s.detector.Detect(message.String("channel"), message.String("ts"))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
