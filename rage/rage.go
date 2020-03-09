@@ -98,7 +98,7 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	}
 
 	r.logger.Infof("%d speakers in the conversation", len(speakers))
-	if len(speakers) < 1 {
+	if len(speakers) < 2 {
 		return nil
 	}
 
