@@ -1,4 +1,4 @@
-![Docker Pulls](https://img.shields.io/docker/pulls/h3poteto/slack-rage)
+[![Docker Pulls](https://img.shields.io/docker/pulls/h3poteto/slack-rage)](https://hub.docker.com/repository/docker/h3poteto/slack-rage)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/h3poteto/slack-rage)](https://github.com/h3poteto/slack-rage/releases)
 
 # SlackRage
