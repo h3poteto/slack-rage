@@ -99,11 +99,9 @@ func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.detector.Detect(message.String("channel"), message.String("ts"))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		// Ignore errors because Slack Event API resend same event when we return error response.
+		// So, sometimes we receive duplicated message.
+		s.detector.Detect(message.String("channel"), message.String("ts"))
 
 		w.WriteHeader(http.StatusOK)
 		return
