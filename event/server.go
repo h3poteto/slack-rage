@@ -13,24 +13,20 @@ import (
 var notifyHistory = map[string]time.Time{}
 
 type Server struct {
-	threshold int
-	period    int
-	channel   string
-	token     string
-	logger    *logrus.Logger
-	detector  *rage.Rage
+	channel  string
+	token    string
+	logger   *logrus.Logger
+	detector *rage.Rage
 }
 
-func NewServer(threshold, period int, channel string, verbose bool) *Server {
+func NewServer(threshold, period, speakers int, channel string, verbose bool) *Server {
 	token := os.Getenv("SLACK_TOKEN")
 	logger := logrus.New()
 	if verbose {
 		logger.SetLevel(logrus.DebugLevel)
 	}
-	detector := rage.New(threshold, period, channel, logger, token)
+	detector := rage.New(threshold, period, speakers, channel, logger, token)
 	return &Server{
-		threshold,
-		period,
 		channel,
 		token,
 		logger,
