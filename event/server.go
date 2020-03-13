@@ -11,6 +11,7 @@ import (
 )
 
 var notifyHistory = map[string]time.Time{}
+var processingEvents = map[string]bool{}
 
 type Server struct {
 	channel  string
@@ -58,6 +59,19 @@ func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Check the event whether it has already received.
+	eventID := event.String("event_id")
+	if _, ok := processingEvents[eventID]; ok {
+		s.logger.Infof("Event has already received: %s", eventID)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Record event id.
+	processingEvents[eventID] = true
+	defer func(eventID string) {
+		delete(processingEvents, eventID)
+	}(eventID)
 
 	switch event.Type() {
 	case "url_verification":
@@ -73,7 +87,7 @@ func (s *Server) HandleEvent(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to cast", http.StatusBadRequest)
 			return
 		}
-		s.logger.Infof("Received event: %+v", mes)
+		s.logger.Infof("Received event: %+v", event)
 
 		message := Event(mes)
 		if message.Type() != "message" {
