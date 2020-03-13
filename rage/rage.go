@@ -20,18 +20,20 @@ func keys(m map[string]bool) []string {
 type Rage struct {
 	threshold     int
 	period        int
+	speakers      int
 	channel       string
 	logger        *logrus.Logger
 	slackClient   *slack.Client
 	notifyHistory map[string]time.Time
 }
 
-func New(threshold, period int, channel string, logger *logrus.Logger, token string) *Rage {
+func New(threshold, period, speakers int, channel string, logger *logrus.Logger, token string) *Rage {
 	notifyHistory := map[string]time.Time{}
 	slackClient := slack.New(token)
 	return &Rage{
 		threshold,
 		period,
+		speakers,
 		channel,
 		logger,
 		slackClient,
@@ -98,7 +100,7 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	}
 
 	r.logger.Infof("%d speakers in the conversation", len(speakers))
-	if len(speakers) < 2 {
+	if len(speakers) < r.speakers {
 		return nil
 	}
 

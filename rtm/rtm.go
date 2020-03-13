@@ -9,15 +9,13 @@ import (
 )
 
 type RTM struct {
-	threshold int
-	period    int
-	channel   string
-	token     string
-	logger    *logrus.Logger
-	detector  *rage.Rage
+	channel  string
+	token    string
+	logger   *logrus.Logger
+	detector *rage.Rage
 }
 
-func New(threshold, period int, channel string, verbose bool) *RTM {
+func New(threshold, period, speakers int, channel string, verbose bool) *RTM {
 	token := os.Getenv("SLACK_TOKEN")
 	logger := logrus.New()
 	if verbose {
@@ -25,10 +23,8 @@ func New(threshold, period int, channel string, verbose bool) *RTM {
 	}
 	// We have to create classic slack app using RTM.
 	// Classic slack app require OAuth token to call REST API separately from bot token.
-	detector := rage.New(threshold, period, channel, logger, os.Getenv("OAUTH_TOKEN"))
+	detector := rage.New(threshold, period, speakers, channel, logger, os.Getenv("OAUTH_TOKEN"))
 	return &RTM{
-		threshold,
-		period,
 		channel,
 		token,
 		logger,
