@@ -103,7 +103,7 @@ func (r *Rage) Detect(messageChannelID string, messageTimestamp string) error {
 	}
 
 	now := time.Now()
-	if timestamp, ok := r.notifyHistory[messageChannelID]; ok && now.Sub(timestamp) < 10*time.Minute {
+	if timestamp, ok := r.notifyHistory[messageChannelID]; ok && now.Sub(timestamp) < time.Duration(r.period)*time.Second {
 		r.logger.Info("Skip notification because of cool time")
 		return nil
 	}
